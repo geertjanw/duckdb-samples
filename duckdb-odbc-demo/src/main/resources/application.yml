@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+app:
+  duckdb:
+    # In-memory DuckDB. Use e.g. jdbc:duckdb:/tmp/demo.duckdb for a persistent file.
+    url: "jdbc:duckdb:"
+  mysql:
+    # ODBC connection string used by the DuckDB odbc extension.
+    # {MariaDB} must match the driver name registered in /etc/odbcinst.ini
+    odbc-connection-string: "Driver={MariaDB};Server=127.0.0.1;Port=3306;Database=demo"
+    # Native connection string used by the DuckDB mysql scanner extension.
+    scanner-connection-string: "host=127.0.0.1 port=3306 user=app_user password=app_password database=demo"
+    username: app_user
+    password: app_password
+
+logging:
+  level:
+    com.example.duckdbodbc: INFO
