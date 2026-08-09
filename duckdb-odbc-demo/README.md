@@ -19,9 +19,9 @@ Every hop in that chain exists for a reason:
   against any particular driver. A driver manager is what resolves
   `Driver={MariaDB}` to an actual `.so` and dispatches the calls; on
   Linux/macOS that manager is unixODBC (Windows has one built in).
-- **MariaDB ODBC driver** — the piece that actually speaks the MySQL wire
-  protocol. unixODBC only routes calls; without a driver there is nothing
-  to route them *to*.
+- **MariaDB ODBC driver** — the piece that actually implements the MySQL
+  wire protocol. unixODBC only routes calls; without a driver there is
+  nothing to route them *to*.
 
 ## ODBC extension vs. ODBC client — don't mix them up
 
@@ -82,7 +82,7 @@ why:
    ```
 
    *Why:* this is the component that actually implements the ODBC API for
-   MySQL/MariaDB — it opens the TCP connection, speaks the wire protocol,
+   MySQL/MariaDB — it opens the TCP connection, handles the wire protocol,
    and translates results into ODBC's C types. The MariaDB driver is used
    because it's protocol-compatible with MySQL and packaged in Debian/
    Ubuntu; MySQL's own Connector/ODBC would work too.
@@ -143,11 +143,38 @@ why:
 
 6. **DuckDB extensions** (`odbc`, and `mysql` for the benchmark) — nothing
    for you to do, but worth knowing: the app runs `INSTALL odbc; LOAD
-   odbc;` at startup because extensions are not compiled into DuckDB — they
-   are downloaded once from the DuckDB extension repository (so the first
-   run needs network access) and cached in `~/.duckdb`. `LOAD` is required
-   on every startup because DuckDB never auto-loads this extension into a
-   session.
+   odbc;` at startup because extensions are not compiled into DuckDB —
+   `INSTALL` downloads them once from the DuckDB extension repository (so
+   the first run needs network access) and caches them in `~/.duckdb`,
+   while `LOAD` links the extension into the current session and is
+   required on every startup, since DuckDB never auto-loads this extension.
+
+## Configuration
+
+All connection details live under custom `app.*` properties in
+`src/main/resources/application.yml` — the demo does **not** use Spring's
+`spring.datasource` auto-configuration (see the `SET VARIABLE` gotcha for
+why):
+
+```yaml
+app:
+  duckdb:
+    # In-memory DuckDB. Use e.g. jdbc:duckdb:/tmp/demo.duckdb for a persistent file.
+    url: "jdbc:duckdb:"
+  mysql:
+    # ODBC connection string used by the DuckDB odbc extension.
+    # {MariaDB} must match the driver name registered in /etc/odbcinst.ini
+    odbc-connection-string: "Driver={MariaDB};Server=127.0.0.1;Port=3306;Database=demo"
+    # Native connection string used by the DuckDB mysql scanner extension.
+    scanner-connection-string: "host=127.0.0.1 port=3306 user=app_user password=app_password database=demo"
+    username: app_user
+    password: app_password
+```
+
+`DuckDbConfig` builds a `JdbcTemplate` from `app.duckdb.url` on a
+**single shared DuckDB connection** (a `SingleConnectionDataSource`), and
+the ODBC connection is opened at startup from
+`app.mysql.odbc-connection-string` plus the credentials.
 
 ## Run it
 
@@ -157,7 +184,11 @@ why:
 #    fails fast if the database isn't reachable.
 docker compose up -d
 
-# 2. Start the app
+# 2. Build: compiles and runs tests, and catches problems before the
+#    app tries to open its ODBC connection.
+mvn clean package
+
+# 3. Start the app
 mvn spring-boot:run
 ```
 
@@ -185,21 +216,27 @@ curl -X POST 'localhost:8080/benchmark/load?rows=10000000'
 # Aggregate through the ODBC extension (row-by-row transfer)
 curl 'localhost:8080/benchmark/odbc'
 
-# Same aggregation through the native MySQL scanner extension
+# Same aggregation through DuckDB's native mysql scanner extension
 curl 'localhost:8080/benchmark/scanner'
+
+# Same aggregation on the local DuckDB table (no-transfer baseline)
+curl 'localhost:8080/benchmark/native'
 ```
 
-*Why two paths:* they answer the same question through two different
+*Why three paths:* they answer the same question through different
 transports. The ODBC path is the universal, works-with-anything adapter;
-the `mysql` scanner speaks the MySQL wire protocol natively. Running the
-identical aggregation over both isolates the cost of the transport itself.
+the `mysql` scanner uses the MySQL wire protocol natively; the local
+table has no transfer at all. Running the identical aggregation over all
+three isolates the cost of the transport itself — the load generates the
+rows into `orders_local` first and MySQL is filled from the same data,
+so all three return the same top-5.
 
-The load endpoint reports timings for both phases
-(`generate_csv_seconds`, `mysql_load_seconds`), so you can tell data
+The load endpoint reports per-phase timings (`generate_seconds`,
+`stage_csv_seconds`, `mysql_load_seconds`), so you can tell data
 generation apart from ODBC transfer.
 
 Expected pattern: the native `mysql` scanner is several times faster than the
-ODBC path, because it streams and vectorizes batches over the MySQL wire
+ODBC path, because it reads and converts batches over the MySQL wire
 protocol, while ODBC fetches and converts values cell by cell. Both are
 bounded by transfer speed, not by DuckDB's aggregation.
 
@@ -207,9 +244,10 @@ bounded by transfer speed, not by DuckDB's aggregation.
 
 Things that cost debugging time, so you don't have to:
 
-- **`LOAD odbc` is not optional.** The extension auto-installs but is never
-  auto-loaded; without an explicit `LOAD odbc` every `odbc_*` function fails
-  with "function does not exist".
+- **`LOAD odbc` is not optional.** `INSTALL` happens once (and DuckDB can
+  even install known extensions implicitly), but the extension is never
+  auto-*loaded*; without an explicit `LOAD odbc` in each session, every
+  `odbc_*` function fails with "function does not exist".
 
 - **The driver name must match exactly.** `Driver={MariaDB}` in the
   connection string is looked up against the `[MariaDB]` section name in
@@ -218,13 +256,16 @@ Things that cost debugging time, so you don't have to:
 
 - **`SET VARIABLE` is per-DuckDB-connection.** The ODBC handle stored via
   `SET VARIABLE conn = odbc_connect(...)` exists only on the connection
-  that set it. A default Hikari pool hands out different connections per
+  that set it. A pooled data source hands out different connections per
   request, so `getvariable('conn')` intermittently returns NULL. Worse,
-  with `jdbc:duckdb:` each pooled connection is its *own* in-memory
-  database. This demo pins a **single connection** (`DuckDbConfig`,
-  `maximum-pool-size: 1`); for production, open the ODBC connection per
-  statement instead (pass a connection string directly to
-  `odbc_query`/`odbc_copy` with `close_connection = true`).
+  with `jdbc:duckdb:` each new connection is its *own* in-memory database —
+  pooled connections wouldn't even share tables or loaded extensions.
+  That's why this demo skips Spring's auto-configured pool entirely:
+  `DuckDbConfig` builds the `JdbcTemplate` on a **single shared DuckDB
+  connection** (`SingleConnectionDataSource` from `app.duckdb.url`). For
+  production, open the ODBC connection per statement instead (pass a
+  connection string directly to `odbc_query`/`odbc_copy` with
+  `close_connection = true` — stateless, therefore pool-safe).
 
 - **There is no `odbc_exec`.** DDL against the remote DB also goes through
   the `odbc_query` **table function** — which means it must appear in a
@@ -238,13 +279,23 @@ Things that cost debugging time, so you don't have to:
   tables of the running app. That's why `BenchmarkService` stages the data
   as a CSV first and passes `source_file`.
 
-- **`create_table = true` needs the CSV header.** The remote `CREATE TABLE`
-  is derived (CTAS-style) from the source columns, so the CSV is written
-  with `HEADER true` to carry the column names; without it the remote table
-  gets autogenerated names.
+- **`create_table = true` does not work against MySQL/MariaDB.** It fails
+  with `column type not recognized: DUCKDB_TYPE_BIGINT` — the automatic
+  type mapping is incomplete for MySQL/MariaDB (Tier 2 support). The
+  workaround, used here, is to create the remote table explicitly through
+  `odbc_query` before the copy — which also lets you define a PRIMARY
+  KEY, something CTAS never gives you. The CSV column order must then
+  match the table column order.
 
-- **`batch_size` only accepts powers of two, max 2048.** The default is a
-  chatty 16 rows per `SQLExecute`; the benchmark uses 2048 because at 100M
+- **MariaDB rejects `odbc_copy`'s default identifier quoting.** The
+  generated `INSERT` double-quotes column names, which MariaDB's default
+  `sql_mode` refuses (it expects backticks). Pass
+  ``column_quotes = '`'`` to `odbc_copy`. (Alternatively, set
+  `sql_mode=ANSI_QUOTES` on the server — but changing the client is less
+  invasive than changing the database.)
+
+- **`batch_size` only accepts powers of two, max 2048.** The default is
+  only 16 rows per `SQLExecute`; the benchmark uses 2048 because at 100M
   rows the per-round-trip overhead dominates. Arbitrary values like 1000
   are rejected.
 
@@ -254,7 +305,7 @@ Things that cost debugging time, so you don't have to:
 
 - **ODBC reads are slow by design.** `odbc_query` is single-threaded, makes
   multiple ODBC API calls per row, and converts every string from UCS-2 to
-  UTF-8. Project only the columns you need — `SELECT *` measurably inflates
+  UTF-8. Select only the columns you need — `SELECT *` measurably inflates
   transfer time.
 
 - **The scanner ATTACH is one-time per session.** Attaching twice with the
@@ -267,17 +318,21 @@ Things that cost debugging time, so you don't have to:
 
 - **Single DuckDB connection** (`DuckDbConfig`): the ODBC handle lives in a
   DuckDB session variable (`SET VARIABLE conn = odbc_connect(...)`), which is
-  scoped to one connection — see Gotchas.
-- **Bulk load** (`BenchmarkService`): DuckDB first generates the orders as a
-  CSV (`COPY ... TO ... (FORMAT CSV, HEADER true)`), then `odbc_copy` bulk-loads
-  it into MySQL with `create_table = true` and `batch_size = 2048`, the
-  maximum rows per `SQLExecute` round trip. The whole load runs inside a
-  remote transaction (`odbc_copy`'s default), so a failed load rolls back
-  instead of leaving a half-filled table. Row-by-row INSERTs over ODBC
-  would be impractically slow at this scale.
+  scoped to one connection — see Gotchas. The connection string and
+  credentials come from `app.mysql.*` in `application.yml`.
+- **Bulk load** (`BenchmarkService`): DuckDB generates the orders into a
+  local table (`orders_local`, which the native benchmark scans), stages
+  it as CSV (`COPY orders_local TO ... (FORMAT CSV, HEADER true)`), creates
+  the remote table explicitly through `odbc_query` (see Gotchas), then
+  `odbc_copy` bulk-loads the CSV with `batch_size = 2048` — the maximum
+  rows per `SQLExecute` round trip — and ``column_quotes = '`'``. The whole
+  load runs inside a remote transaction (`odbc_copy`'s default), so a
+  failed load rolls back instead of leaving a half-filled table.
+  Row-by-row INSERTs over ODBC would be impractically slow at this scale.
 - DDL goes through the `odbc_query` table function (hence
   `FROM odbc_query(...)`), e.g. the `DROP TABLE IF EXISTS orders` before
   each load — dropping first makes the load endpoint idempotent.
 - The `mysql` scanner is attached lazily (`INSTALL mysql; LOAD mysql;`) with
-  `ATTACH '...' AS mysqldb (TYPE mysql, READ_ONLY)` — lazily so the app
-  starts fine even when only the ODBC endpoints are used.
+  `ATTACH '...' AS mysqldb (TYPE mysql, READ_ONLY)`, using
+  `app.mysql.scanner-connection-string` — lazily so the app starts fine
+  even when only the ODBC endpoints are used.
