@@ -48,4 +48,10 @@ public class DemoController {
     public Map<String, Object> benchScanner() {
         return benchmark.benchmarkMySqlScanner();
     }
+
+    /** Benchmark the same aggregation on the local DuckDB table (no transfer). */
+    @GetMapping("/benchmark/native")
+    public Map<String, Object> benchNative() {
+        return benchmark.benchmarkNative();
+    }
 }
