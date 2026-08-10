@@ -43,9 +43,12 @@ uses the consumer side only.
 
 Everything that must be in place before `uvicorn` works, and why:
 
-1. **Python 3.10+** — the app uses modern type-hint syntax (`str | None`).
-   DuckDB itself needs no separate install: the `duckdb` package on PyPI
-   bundles the native library and loads it at import time.
+1. **Python 3.10+** — the app uses modern type-hint syntax (`str | None`),
+   and `duckdb` 1.5.5 publishes no wheels for 3.9 (pip on 3.9 silently
+   resolves to an old 1.4.x and then fails). DuckDB itself needs no separate
+   install: the `duckdb` package on PyPI bundles the native library and loads
+   it at import time. Check with `python3 --version`; if your default `python3`
+   is older, invoke a newer one explicitly (e.g. `python3.13 -m venv .venv`).
 
 2. **Docker + Docker Compose** — provides the MySQL side of the demo
    (a MariaDB container seeded with the small `customers` dataset) without
@@ -184,7 +187,9 @@ from `odbc_connection_string` plus the credentials.
 docker compose up -d
 
 # 2. Create a virtualenv and install dependencies.
-python3 -m venv .venv && source .venv/bin/activate
+#    Use a Python 3.10+ interpreter explicitly - a default python3 that is
+#    still 3.9 can't install duckdb 1.5.5 (see Prerequisites).
+python3.13 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 # 3. Start the app
