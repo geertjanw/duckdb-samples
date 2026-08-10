@@ -1,7 +1,8 @@
 # DuckDB ODBC Extension × FastAPI Demo (Python)
 
 > Python/FastAPI edition. For the same demo built with Spring Boot, see
-> [`duckdb-odbc-java-demo`](../duckdb-odbc-java-demo).
+> [`duckdb-odbc-java-demo`](../duckdb-odbc-java-demo); for Node.js/Express,
+> see [`duckdb-odbc-node-demo`](../duckdb-odbc-node-demo).
 
 Queries MySQL through the **DuckDB ODBC extension**, with DuckDB embedded
 in a FastAPI application:

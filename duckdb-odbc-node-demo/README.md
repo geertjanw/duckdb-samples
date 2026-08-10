@@ -1,22 +1,24 @@
-# DuckDB ODBC Extension × Spring Boot Demo (Java)
+# DuckDB ODBC Extension × Express Demo (Node.js)
 
-> Java/Spring Boot edition. For the same demo built with FastAPI, see
-> [`duckdb-odbc-python-demo`](../duckdb-odbc-python-demo); for Node.js/Express,
-> see [`duckdb-odbc-node-demo`](../duckdb-odbc-node-demo).
+> Node.js/Express edition. For the same demo built with Spring Boot, see
+> [`duckdb-odbc-java-demo`](../duckdb-odbc-java-demo); for FastAPI, see
+> [`duckdb-odbc-python-demo`](../duckdb-odbc-python-demo).
 
 Queries MySQL through the **DuckDB ODBC extension**, with DuckDB embedded
-in a Spring Boot application:
+in an Express application:
 
 ```
-Spring Boot → JDBC → DuckDB (in-process) → odbc extension → unixODBC → MariaDB ODBC driver → MySQL
+Express → @duckdb/node-api (in-process) → odbc extension → unixODBC → MariaDB ODBC driver → MySQL
 ```
 
 Every hop in that chain exists for a reason:
 
-- **Spring Boot → JDBC** — Java's standard database API; `JdbcTemplate`
-  needs *some* JDBC driver, and DuckDB ships one.
+- **Express → @duckdb/node-api** — the `@duckdb/node-api` package embeds the
+  database as a native addon and exposes an async connection API; there is no
+  separate JDBC driver in the Node world, the package *is* the client.
 - **DuckDB (in-process)** — DuckDB is an embedded database: it runs inside
-  the JVM as a library, so there is no DuckDB server to deploy or manage.
+  the Node process as a library, so there is no DuckDB server to deploy or
+  manage.
 - **odbc extension** — DuckDB core has no MySQL client built in; the
   extension adds the ability to reach out to external databases.
 - **unixODBC** — the extension is written against the ODBC *API*, not
@@ -40,13 +42,12 @@ uses the consumer side only.
 
 ## Prerequisites
 
-Everything that must be in place before `mvn spring-boot:run` works, and
-why:
+Everything that must be in place before `npm start` works, and why:
 
-1. **Java 17+ and Maven** — the app uses Java text blocks (15+) and Spring
-   Boot 3, which requires 17. DuckDB itself needs no separate install: the
-   `duckdb_jdbc` Maven dependency bundles the native library and loads it
-   at runtime.
+1. **Node.js 18+** — the app uses ES modules and modern syntax. DuckDB itself
+   needs no separate install: the `@duckdb/node-api` package bundles a
+   prebuilt native addon and loads it at import time. `npm install` fetches
+   the binary for your platform, so the first install needs network access.
 
 2. **Docker + Docker Compose** — provides the MySQL side of the demo
    (a MariaDB container seeded with the small `customers` dataset) without
@@ -72,7 +73,7 @@ why:
      `odbcinst -j` prints which config files unixODBC actually reads
      (useful when an edit seems to have no effect — you may be editing the
      wrong file), and `isql <DSN>` lets you test a connection *outside*
-     DuckDB and the JVM, which cleanly separates "ODBC is broken" from
+     DuckDB and Node, which cleanly separates "ODBC is broken" from
      "the app is broken".
    - Config lookup can be redirected with environment variables:
      `ODBCSYSINI` points to the directory holding `odbcinst.ini`/`odbc.ini`
@@ -100,7 +101,7 @@ why:
      and reference that name in the connection string
      (e.g. `Driver={MySQL ODBC 9.x Unicode Driver}`).
    - The driver's architecture must match the *process* loading it: a
-     64-bit JVM (hence 64-bit DuckDB) can only load a 64-bit driver `.so`.
+     64-bit Node (hence 64-bit DuckDB) can only load a 64-bit driver `.so`.
      Distro packages get this right automatically; it mainly bites when a
      driver was installed manually from a vendor tarball.
    - Installing the package does **not** make the driver usable yet — the
@@ -134,7 +135,7 @@ why:
      `Database` inline — so only `odbcinst.ini` is needed. Alternatively
      you could define a named DSN in `odbc.ini` referencing the driver and
      connect with just `DSN=mydsn`; useful if you want connection details
-     out of `application.yml`, at the cost of another host-specific file.
+     out of `config.js`, at the cost of another host-specific file.
    - Two DuckDB-side sanity checks: `FROM odbc_list_drivers();` shows what
      the driver manager can see, and `FROM odbc_list_data_sources();` lists
      any DSNs. If a driver appears in `odbcinst -q -d` but not in
@@ -155,30 +156,26 @@ why:
 
 ## Configuration
 
-All connection details live under custom `app.*` properties in
-`src/main/resources/application.yml` — the demo does **not** use Spring's
-`spring.datasource` auto-configuration (see the `SET VARIABLE` gotcha for
-why):
+All connection details live in `src/config.js` and can be overridden with
+`APP_*` environment variables, which keeps the connection details out of the
+source the same way the Java demo's `application.yml` does:
 
-```yaml
-app:
-  duckdb:
-    # In-memory DuckDB. Use e.g. jdbc:duckdb:/tmp/demo.duckdb for a persistent file.
-    url: "jdbc:duckdb:"
-  mysql:
-    # ODBC connection string used by the DuckDB odbc extension.
-    # {MariaDB} must match the driver name registered in /etc/odbcinst.ini
-    odbc-connection-string: "Driver={MariaDB};Server=127.0.0.1;Port=3306;Database=demo"
-    # Native connection string used by the DuckDB mysql scanner extension.
-    scanner-connection-string: "host=127.0.0.1 port=3306 user=app_user password=app_password database=demo"
-    username: app_user
-    password: app_password
+```js
+duckdb.database           = ":memory:"                    // APP_DUCKDB_DATABASE
+mysql.odbcConnectionString = "Driver={MariaDB};Server=127.0.0.1;Port=3306;Database=demo"
+mysql.scannerConnectionString = "host=127.0.0.1 port=3306 user=app_user password=app_password database=demo"
+mysql.username            = "app_user"                    // APP_MYSQL_USERNAME
+mysql.password            = "app_password"                // APP_MYSQL_PASSWORD
 ```
 
-`DuckDbConfig` builds a `JdbcTemplate` from `app.duckdb.url` on a
-**single shared DuckDB connection** (a `SingleConnectionDataSource`), and
-the ODBC connection is opened at startup from
-`app.mysql.odbc-connection-string` plus the credentials.
+- `odbcConnectionString` is used by the DuckDB `odbc` extension; `{MariaDB}`
+  must match the driver name registered in `/etc/odbcinst.ini`.
+- `scannerConnectionString` is the native connection string used by the
+  DuckDB `mysql` scanner extension.
+
+`src/duckdbConn.js` opens a **single shared DuckDB connection** at startup
+(`DuckDBInstance.create(...)` then `.connect()`), and the ODBC connection is
+opened at startup from `odbcConnectionString` plus the credentials.
 
 ## Run it
 
@@ -188,12 +185,11 @@ the ODBC connection is opened at startup from
 #    fails fast if the database isn't reachable.
 docker compose up -d
 
-# 2. Build: compiles and runs tests, and catches problems before the
-#    app tries to open its ODBC connection.
-mvn clean package
+# 2. Install dependencies (fetches the prebuilt DuckDB native addon).
+npm install
 
 # 3. Start the app
-mvn spring-boot:run
+npm start
 ```
 
 ## Try it
@@ -227,7 +223,7 @@ curl 'localhost:8080/benchmark/scanner'
 curl 'localhost:8080/benchmark/native'
 
 # Iterate
-for p in odbc scanner native; do                           
+for p in odbc scanner native; do
   echo "== $p =="
   for i in 1 2 3 4 5 6; do curl -s "localhost:8080/benchmark/$p"; echo; done
 done
@@ -266,16 +262,22 @@ Things that cost debugging time, so you don't have to:
 
 - **`SET VARIABLE` is per-DuckDB-connection.** The ODBC handle stored via
   `SET VARIABLE conn = odbc_connect(...)` exists only on the connection
-  that set it. A pooled data source hands out different connections per
-  request, so `getvariable('conn')` intermittently returns NULL. Worse,
-  with `jdbc:duckdb:` each new connection is its *own* in-memory database —
-  pooled connections wouldn't even share tables or loaded extensions.
-  That's why this demo skips Spring's auto-configured pool entirely:
-  `DuckDbConfig` builds the `JdbcTemplate` on a **single shared DuckDB
-  connection** (`SingleConnectionDataSource` from `app.duckdb.url`). For
-  production, open the ODBC connection per statement instead (pass a
-  connection string directly to `odbc_query`/`odbc_copy` with
-  `close_connection = true` — stateless, therefore pool-safe).
+  that set it. This is exactly why the demo shares one DuckDB connection for
+  the whole app (`src/duckdbConn.js`) instead of opening a connection per
+  request: with `:memory:` each new connection is its *own* in-memory
+  database, so separate connections wouldn't even share tables or loaded
+  extensions. For production, open the ODBC connection per statement instead
+  (pass a connection string directly to `odbc_query`/`odbc_copy` with
+  `close_connection = true` — stateless, therefore safe to parallelize).
+  `duckdbConn` serializes statements through a promise queue so the
+  session-variable state can't interleave across concurrent requests.
+
+- **BIGINT and DECIMAL don't survive `JSON.stringify`.** The Node API returns
+  DuckDB `BIGINT` as a JavaScript `BigInt` and `DECIMAL` as a value object,
+  neither of which `JSON.stringify` (and therefore `res.json`) can serialize.
+  The demo reads results with `getRowObjectsJson()`, which converts them to
+  JSON-safe values (BIGINT → string, DECIMAL → string) — hence the `id` and
+  `revenue` fields come back as strings.
 
 - **There is no `odbc_exec`.** DDL against the remote DB also goes through
   the `odbc_query` **table function** — which means it must appear in a
@@ -286,7 +288,7 @@ Things that cost debugging time, so you don't have to:
 
 - **`odbc_copy` can't see your in-memory tables.** Its source query runs in
   a separate DuckDB instance, so `source_query = 'FROM my_table'` fails for
-  tables of the running app. That's why `BenchmarkService` stages the data
+  tables of the running app. That's why `benchmarkService` stages the data
   as a CSV first and passes `source_file`.
 
 - **`create_table = true` does not work against MySQL/MariaDB.** It fails
@@ -310,7 +312,7 @@ Things that cost debugging time, so you don't have to:
   are rejected.
 
 - **Disk space for the staged CSV.** The generated `orders.csv` lands in
-  `java.io.tmpdir` and reaches several GB at 100M rows. Make sure `/tmp`
+  the OS temp dir and reaches several GB at 100M rows. Make sure `/tmp`
   isn't a small tmpfs.
 
 - **ODBC reads are slow by design.** `odbc_query` is single-threaded, makes
@@ -320,17 +322,19 @@ Things that cost debugging time, so you don't have to:
 
 - **The scanner ATTACH is one-time per session.** Attaching twice with the
   same alias fails, hence the lazy, guarded
-  `ATTACH '...' AS mysqldb (TYPE mysql, READ_ONLY)` in `BenchmarkService`.
+  `ATTACH '...' AS mysqldb (TYPE mysql, READ_ONLY)` in `benchmarkService`.
   `READ_ONLY` because the benchmark only reads and it lets DuckDB skip
   transaction bookkeeping on the attached database.
 
 ## Implementation notes
 
-- **Single DuckDB connection** (`DuckDbConfig`): the ODBC handle lives in a
-  DuckDB session variable (`SET VARIABLE conn = odbc_connect(...)`), which is
-  scoped to one connection — see Gotchas. The connection string and
-  credentials come from `app.mysql.*` in `application.yml`.
-- **Bulk load** (`BenchmarkService`): DuckDB generates the orders into a
+- **Single DuckDB connection** (`src/duckdbConn.js`): the ODBC handle lives
+  in a DuckDB session variable (`SET VARIABLE conn = odbc_connect(...)`), which
+  is scoped to one connection — see Gotchas. A promise queue serializes
+  statements so concurrent requests can't interleave on the shared connection.
+  The connection string and credentials come from `src/config.js` (overridable
+  via `APP_*` env vars).
+- **Bulk load** (`benchmarkService`): DuckDB generates the orders into a
   local table (`orders_local`, which the native benchmark scans), stages
   it as CSV (`COPY orders_local TO ... (FORMAT CSV, HEADER true)`), creates
   the remote table explicitly through `odbc_query` (see Gotchas), then
@@ -344,5 +348,5 @@ Things that cost debugging time, so you don't have to:
   each load — dropping first makes the load endpoint idempotent.
 - The `mysql` scanner is attached lazily (`INSTALL mysql; LOAD mysql;`) with
   `ATTACH '...' AS mysqldb (TYPE mysql, READ_ONLY)`, using
-  `app.mysql.scanner-connection-string` — lazily so the app starts fine
-  even when only the ODBC endpoints are used.
+  `scannerConnectionString` — lazily so the app starts fine even when only
+  the ODBC endpoints are used.
