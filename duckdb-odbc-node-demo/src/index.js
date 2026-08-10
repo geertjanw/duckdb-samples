@@ -77,8 +77,18 @@ async function main() {
   await db.connect();
   // Open the ODBC connection at startup; fail fast if MySQL isn't reachable.
   await odbc.init();
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     console.log(`Listening on http://localhost:${config.port}`);
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(
+        `Port ${config.port} is already in use. Stop whatever is on it, ` +
+          `or start on another port: PORT=8081 npm start`
+      );
+      process.exit(1);
+    }
+    throw err;
   });
 }
 
