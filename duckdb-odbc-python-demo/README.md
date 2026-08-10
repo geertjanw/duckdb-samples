@@ -218,6 +218,8 @@ FastAPI also serves interactive API docs at `http://localhost:8080/docs`.
 ```bash
 # Generate rows in DuckDB and bulk-load into MySQL.
 # Start smaller (e.g. 10M) to test; 100M needs a few GB of disk and patience.
+# Run this in the SAME session before /benchmark/native: orders_local is an
+# in-memory table and is gone after a restart (see Gotchas).
 curl -X POST 'localhost:8080/benchmark/load?rows=10000000'
 
 # Aggregate through the ODBC extension (row-by-row transfer)
@@ -325,6 +327,18 @@ Things that cost debugging time, so you don't have to:
   `ATTACH '...' AS mysqldb (TYPE mysql, READ_ONLY)` in `benchmark_service`.
   `READ_ONLY` because the benchmark only reads and it lets DuckDB skip
   transaction bookkeeping on the attached database.
+
+- **`orders_local` does not survive a restart, but MySQL's `orders` does.**
+  `orders_local` is an in-memory DuckDB table — it exists only for the life of
+  the running process — while MySQL's `orders` lives in the Docker container
+  and persists. So after you restart the app without re-running the load,
+  `/benchmark/odbc` and `/benchmark/scanner` still work (they read MySQL) but
+  `/benchmark/native` fails with `Catalog Error: Table with name orders_local
+  does not exist`. The fix is to run `POST /benchmark/load` again in the
+  current session before hitting `/benchmark/native`; the load regenerates
+  `orders_local` and refills MySQL from the same data. (Set
+  `APP_DUCKDB_DATABASE` to a file path instead of `:memory:` to make it
+  persist.)
 
 ## Implementation notes
 
