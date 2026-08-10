@@ -1,0 +1,4 @@
+# Embedded DuckDB + JDBC-free Python API. 1.5.5 matches the Java demo's duckdb_jdbc 1.5.5.0.
+duckdb==1.5.5
+fastapi==0.115.5
+uvicorn[standard]==0.32.1

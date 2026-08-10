@@ -1,4 +1,7 @@
-# DuckDB ODBC Extension × Spring Boot Demo
+# DuckDB ODBC Extension × Spring Boot Demo (Java)
+
+> Java/Spring Boot edition. For the same demo built with FastAPI, see
+> [`duckdb-odbc-python-demo`](../duckdb-odbc-python-demo).
 
 Queries MySQL through the **DuckDB ODBC extension**, with DuckDB embedded
 in a Spring Boot application:
@@ -221,6 +224,12 @@ curl 'localhost:8080/benchmark/scanner'
 
 # Same aggregation on the local DuckDB table (no-transfer baseline)
 curl 'localhost:8080/benchmark/native'
+
+# Iterate
+for p in odbc scanner native; do                           
+  echo "== $p =="
+  for i in 1 2 3 4 5 6; do curl -s "localhost:8080/benchmark/$p"; echo; done
+done
 ```
 
 *Why three paths:* they answer the same question through different

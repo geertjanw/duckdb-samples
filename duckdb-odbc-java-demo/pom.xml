@@ -12,9 +12,9 @@
     </parent>
 
     <groupId>com.example</groupId>
-    <artifactId>duckdb-odbc-demo</artifactId>
+    <artifactId>duckdb-odbc-java-demo</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>duckdb-odbc-demo</name>
+    <name>duckdb-odbc-java-demo</name>
     <description>Querying MySQL through the DuckDB ODBC extension from Spring Boot</description>
 
     <properties>
