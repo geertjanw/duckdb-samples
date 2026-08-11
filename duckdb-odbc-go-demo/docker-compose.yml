@@ -1,0 +1,14 @@
+services:
+  mysql:
+    image: mariadb:11
+    container_name: duckdb-odbc-mysql
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: demo
+      MARIADB_USER: app_user
+      MARIADB_PASSWORD: app_password
+    ports:
+      - "3306:3306"
+    command: --local-infile=1   # needed for the fast bulk load in the benchmark
+    volumes:
+      - ./mysql-init:/docker-entrypoint-initdb.d
