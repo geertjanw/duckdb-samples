@@ -21,3 +21,27 @@ so you can compare how the identical DuckDB SQL looks through each binding.
 Every demo shares the same `docker-compose.yml` (a seeded MariaDB container) and
 the same explanation of the ODBC chain, so start with whichever language you
 know best — each README stands on its own.
+
+### Run every demo with one command
+
+```bash
+./run-all-demos.sh
+```
+
+Because each demo on its own listens on port `8080` and expects its own MariaDB
+on `3306`, this script brings up a **single shared MariaDB** and then starts each
+app on its own port:
+
+| Demo | URL |
+|---|---|
+| Java (Spring Boot) | http://localhost:8081 |
+| Python (FastAPI) | http://localhost:8082 |
+| Node.js (Express) | http://localhost:8083 |
+| Go (net/http) | http://localhost:8084 |
+| Rust (Axum) | http://localhost:8085 |
+
+Each demo needs its own toolchain (`mvn`, `python3`, `npm`, `go`, `cargo`) plus
+Docker; any demo whose toolchain is missing is skipped with a note, and the rest
+still run. Per-demo output is written to `./logs/<demo>.log`, and first-time
+builds (Maven, Cargo, npm) can take a while. Press `Ctrl+C` to stop every app and
+tear down the shared MariaDB.
