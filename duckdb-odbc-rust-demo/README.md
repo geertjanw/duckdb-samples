@@ -213,7 +213,7 @@ curl 'localhost:8080/customers/top?limit=5'
 curl 'localhost:8080/customers/revenue-by-country'
 ```
 
-## Stretch goal: 100M-row benchmark
+## 100M-row benchmark
 
 ```bash
 # Generate rows in DuckDB and bulk-load into MySQL.

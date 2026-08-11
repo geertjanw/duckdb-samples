@@ -213,7 +213,7 @@ curl 'localhost:8080/customers/revenue-by-country'
 
 FastAPI also serves interactive API docs at `http://localhost:8080/docs`.
 
-## Stretch goal: 100M-row benchmark
+## 100M-row benchmark
 
 ```bash
 # Generate rows in DuckDB and bulk-load into MySQL.

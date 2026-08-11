@@ -79,21 +79,41 @@ JSON **number**; Node additionally stringifies `BIGINT`; and key ordering follow
 each language's map/struct conventions (Go sorts map keys alphabetically, Rust
 follows struct field order, the JVM/Python preserve insertion order).
 
-**Benchmark trio (`/benchmark/*`), 1,000,000 generated `orders` rows.** The
-timings are effectively identical across languages, because the aggregation runs
-inside DuckDB/MariaDB — the binding only marshals the call, so it barely moves the
-numbers:
+**Benchmark trio (`/benchmark/*`), 100,000,000 generated `orders` rows.** All
+five ship the same DuckDB core (1.5.5), open it in-memory, and default to the
+same 12 threads, so the aggregation itself is the same work everywhere — the
+binding just marshals the call. Each demo below was run against its own **freshly
+recreated MariaDB** (`docker compose down -v` between runs) so InnoDB started cold
+and comparable:
 
 | Demo | Load into MariaDB | ODBC extension | MySQL scanner | Native DuckDB |
 |---|---|---|---|---|
-| Java | 2.39 s | 0.31 s | 0.11 s | ~0.00 s |
-| Python | 2.05 s | 0.32 s | 0.12 s | ~0.00 s |
-| Node.js | 2.23 s | 0.33 s | 0.12 s | ~0.00 s |
-| Go | 2.41 s | 0.31 s | 0.11 s | ~0.00 s |
-| Rust | 2.19 s | 0.31 s | 0.12 s | ~0.00 s |
+| Java | 244.4 s | 36.2 s | 12.5 s | 0.22 s |
+| Python | 128.2 s | 21.8 s | 3.7 s | 0.18 s |
+| Node.js | 239.2 s | 34.8 s | 11.7 s | 0.18 s |
+| Go | 244.1 s | 34.9 s | 12.1 s | 0.13 s |
+| Rust | 206.2 s | 35.1 s | 12.3 s | 0.20 s |
 
-The relative ordering is the real lesson and it holds everywhere: reading through
-the **ODBC extension** is the slowest path (~0.3 s), the **native MySQL scanner**
-is roughly 3× faster (~0.1 s), and querying a **local DuckDB table** with no
-round-trip is effectively instant. Choose a language for its ergonomics — the
-DuckDB engine, not the binding, decides performance.
+Reading the table:
+
+- **The `native` column is the clean apples-to-apples number** — a pure local
+  DuckDB aggregation with no MySQL round-trip. It is essentially identical across
+  all five (0.13–0.22 s), which is the real result: **the language binding does
+  not change DuckDB's execution speed.**
+- **The relative ordering is stark and holds within every single run**: the
+  **ODBC extension** is the slowest read path (streams every row over ODBC), the
+  **native MySQL scanner** is roughly 3× faster, and the **local DuckDB table** is
+  ~100× faster again — effectively instant. This matched a smaller 1,000,000-row
+  pass where all five clustered at ODBC ~0.31 s, scanner ~0.11 s, native ~0 s.
+- **The MySQL-touching columns (load, ODBC, scanner) carry real variance** that is
+  *not* about the language: they depend on MariaDB/InnoDB and host disk state. The
+  four JVM/Go/Node/Rust runs cluster tightly (ODBC ~35 s, scanner ~12 s), while
+  the Python run reproduced markedly lower numbers (ODBC 21.8 s, scanner 3.7 s) in
+  two separate measurements. Both DuckDB builds are 1.5.5 with identical settings,
+  so this looks like a difference in the PyPI build / its downloaded extension
+  binaries rather than anything about Python the language — recorded here as an
+  honest observation, not a fully diagnosed root cause.
+
+Bottom line: choose a language for its ergonomics. Within a run the data path you
+pick (ODBC vs. scanner vs. local) dominates everything, and the no-transfer local
+DuckDB baseline is identical across all five bindings.

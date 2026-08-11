@@ -38,7 +38,7 @@ def revenue_by_country():
 
 @app.post("/benchmark/load")
 def load(rows: int = 100_000_000):
-    """Stretch goal: generate and load N rows into MySQL (default 100M)."""
+    """Generate and load N rows into MySQL (default 100M)."""
     return benchmark_service.generate_and_load_orders(rows)
 
 

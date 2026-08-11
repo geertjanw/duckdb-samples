@@ -31,7 +31,7 @@ public class DemoController {
         return odbc.revenueByCountry();
     }
 
-    /** Stretch goal: generate and load N rows into MySQL (default 100M). */
+    /** Generate and load N rows into MySQL (default 100M). */
     @PostMapping("/benchmark/load")
     public Map<String, Object> load(@RequestParam(defaultValue = "100000000") long rows) {
         return benchmark.generateAndLoadOrders(rows);

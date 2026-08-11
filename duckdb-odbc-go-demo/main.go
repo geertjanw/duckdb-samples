@@ -46,7 +46,7 @@ func main() {
 		writeJSON(w, func() (any, error) { return odbc.RevenueByCountry(r.Context()) })
 	})
 
-	// Stretch goal: generate and load N rows into MySQL (default 100M).
+	// Generate and load N rows into MySQL (default 100M).
 	mux.HandleFunc("POST /benchmark/load", func(w http.ResponseWriter, r *http.Request) {
 		rows := int64(queryInt(r, "rows", 100_000_000))
 		writeJSON(w, func() (any, error) { return bench.GenerateAndLoadOrders(r.Context(), rows) })

@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Stretch goals:
+ * Benchmark:
  *  1. Generate a large orders table and load it into MySQL/MariaDB.
  *  2. Benchmark the same aggregation through
  *     (a) the ODBC extension, (b) the native MySQL scanner extension, and

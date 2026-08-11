@@ -56,7 +56,7 @@ async fn main() {
         .route("/customers/top", get(top_customers))
         // MySQL rows aggregated by DuckDB - the hybrid query demo.
         .route("/customers/revenue-by-country", get(revenue_by_country))
-        // Stretch goal: generate and load N rows into MySQL (default 100M).
+        // Generate and load N rows into MySQL (default 100M).
         .route("/benchmark/load", post(bench_load))
         // Benchmark the aggregation through the ODBC extension.
         .route("/benchmark/odbc", get(bench_odbc))

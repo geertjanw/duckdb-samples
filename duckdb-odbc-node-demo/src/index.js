@@ -34,7 +34,7 @@ app.get(
   })
 );
 
-// Stretch goal: generate and load N rows into MySQL (default 100M).
+// Generate and load N rows into MySQL (default 100M).
 app.post(
   '/benchmark/load',
   wrap(async (req, res) => {
