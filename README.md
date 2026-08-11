@@ -80,40 +80,44 @@ each language's map/struct conventions (Go sorts map keys alphabetically, Rust
 follows struct field order, the JVM/Python preserve insertion order).
 
 **Benchmark trio (`/benchmark/*`), 100,000,000 generated `orders` rows.** All
-five ship the same DuckDB core (1.5.5), open it in-memory, and default to the
-same 12 threads, so the aggregation itself is the same work everywhere — the
-binding just marshals the call. Each demo below was run against its own **freshly
-recreated MariaDB** (`docker compose down -v` between runs) so InnoDB started cold
-and comparable:
+five ship the same DuckDB core (1.5.5), open it in-memory, default to the same 12
+threads, and load the *same* `odbc`/`mysql` extension binaries from the shared
+`~/.duckdb` cache. The aggregation is therefore identical work everywhere — the
+binding only marshals the call.
 
-| Demo | Load into MariaDB | ODBC extension | MySQL scanner | Native DuckDB |
-|---|---|---|---|---|
-| Java | 244.4 s | 36.2 s | 12.5 s | 0.22 s |
-| Python | 128.2 s | 21.8 s | 3.7 s | 0.18 s |
-| Node.js | 239.2 s | 34.8 s | 11.7 s | 0.18 s |
-| Go | 244.1 s | 34.9 s | 12.1 s | 0.13 s |
-| Rust | 206.2 s | 35.1 s | 12.3 s | 0.20 s |
+The **relative ordering of the three data paths is the real lesson, and it is
+stark** (representative single run, 100M rows):
 
-Reading the table:
+| Path | Time | What it does |
+|---|---|---|
+| ODBC extension (`/benchmark/odbc`) | ~35–40 s | Streams every row out of MySQL over ODBC, then aggregates |
+| MySQL scanner (`/benchmark/scanner`) | ~12 s | Aggregates through DuckDB's native MySQL scanner |
+| Native DuckDB (`/benchmark/native`) | ~0.2 s | Aggregates a local DuckDB table — no round-trip |
 
-- **The `native` column is the clean apples-to-apples number** — a pure local
-  DuckDB aggregation with no MySQL round-trip. It is essentially identical across
-  all five (0.13–0.22 s), which is the real result: **the language binding does
-  not change DuckDB's execution speed.**
-- **The relative ordering is stark and holds within every single run**: the
-  **ODBC extension** is the slowest read path (streams every row over ODBC), the
-  **native MySQL scanner** is roughly 3× faster, and the **local DuckDB table** is
-  ~100× faster again — effectively instant. This matched a smaller 1,000,000-row
-  pass where all five clustered at ODBC ~0.31 s, scanner ~0.11 s, native ~0 s.
-- **The MySQL-touching columns (load, ODBC, scanner) carry real variance** that is
-  *not* about the language: they depend on MariaDB/InnoDB and host disk state. The
-  four JVM/Go/Node/Rust runs cluster tightly (ODBC ~35 s, scanner ~12 s), while
-  the Python run reproduced markedly lower numbers (ODBC 21.8 s, scanner 3.7 s) in
-  two separate measurements. Both DuckDB builds are 1.5.5 with identical settings,
-  so this looks like a difference in the PyPI build / its downloaded extension
-  binaries rather than anything about Python the language — recorded here as an
-  honest observation, not a fully diagnosed root cause.
+Choosing the data path is worth ~3× (ODBC → scanner) and then ~60× again
+(scanner → local, no transfer). The same ordering held in a smaller 1,000,000-row
+pass (ODBC ~0.31 s, scanner ~0.11 s, native ~0 s).
 
-Bottom line: choose a language for its ergonomics. Within a run the data path you
-pick (ODBC vs. scanner vs. local) dominates everything, and the no-transfer local
-DuckDB baseline is identical across all five bindings.
+**The language binding does *not* change performance.** An early set of
+per-language runs *appeared* to show Python 2–3× faster on the MySQL-reading
+paths, but that was a benchmarking artifact, not a real effect. Measuring each
+demo in its own separate run let host-level state drift between runs — the macOS
+page cache, the Docker/Rancher VM's buffer cache, and warm disk blocks all persist
+and keep warming across a session, and `docker compose down -v` resets only the
+container's InnoDB, not that host state. A controlled A/B settles it: with Java and
+Python pointed at the **same** loaded 100M table and queried back to back, the
+numbers are identical within noise —
+
+| Path (same table, back-to-back) | Java | Python |
+|---|---|---|
+| MySQL scanner | 12.4 / 12.1 / 11.9 s | 12.2 / 12.1 / 12.4 s |
+| ODBC extension | 38.0 s | 41.2 s |
+
+The `native` (no-I/O) path was likewise identical across all five (0.13–0.22 s)
+from the start — the giveaway that only the MySQL-touching paths were picking up
+external variance.
+
+Bottom line: choose a language for its ergonomics. Within a run the *data path*
+you pick dominates everything; the binding does not. And treat absolute
+MySQL-path timings as I/O-bound and machine-dependent — compare paths within one
+run, not one language against another across runs.
