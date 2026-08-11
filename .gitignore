@@ -1,3 +1,5 @@
-/duckdb-odbc-java-demo/target/
+/odbc-scenarios/duckdb-odbc-java-demo/target/
+/batch-scenarios/*/target/
+/batch-scenarios/data/
 .DS_Store
 /logs/

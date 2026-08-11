@@ -1,0 +1,22 @@
+spring:
+  # In-memory H2 for Spring Batch's own JobRepository metadata tables.
+  datasource:
+    url: "jdbc:h2:mem:batchmeta;DB_CLOSE_DELAY=-1"
+    driver-class-name: org.h2.Driver
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      # Run the single Job on startup, then let the app exit.
+      enabled: true
+
+logging:
+  level:
+    org.springframework.batch: WARN
+
+app:
+  # Number of order rows to generate/transform. Override with --app.rows=...
+  rows: 10000000
+  # Shared data directory, one level up so both batch demos read the same
+  # generated orders.csv and drop their summaries side by side (created if missing).
+  data-dir: ../data

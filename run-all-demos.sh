@@ -33,7 +33,7 @@ cleanup() {
     [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
   done
   echo "==> Stopping shared MariaDB..."
-  (cd "$ROOT/duckdb-odbc-go-demo" && docker compose down) >/dev/null 2>&1 || true
+  (cd "$ROOT/odbc-scenarios/duckdb-odbc-go-demo" && docker compose down) >/dev/null 2>&1 || true
   echo "==> Done."
 }
 trap cleanup INT TERM EXIT
@@ -46,7 +46,7 @@ if ! have docker; then
   exit 1
 fi
 echo "==> Starting shared MariaDB (port 3306)..."
-(cd "$ROOT/duckdb-odbc-go-demo" && docker compose up -d)
+(cd "$ROOT/odbc-scenarios/duckdb-odbc-go-demo" && docker compose up -d)
 
 echo "==> Waiting for MariaDB to accept connections..."
 for i in $(seq 1 60); do
@@ -70,14 +70,14 @@ start() { # name  port  dir  command...
 
 # 2. Each app on its own port, only if its toolchain is present.
 if have mvn; then
-  start java 8081 duckdb-odbc-java-demo \
+  start java 8081 odbc-scenarios/duckdb-odbc-java-demo \
     env SERVER_PORT=8081 mvn -q spring-boot:run
 else
   echo "--  Skipping Java demo (mvn not found)."
 fi
 
 if have python3; then
-  ( cd "$ROOT/duckdb-odbc-python-demo" \
+  ( cd "$ROOT/odbc-scenarios/duckdb-odbc-python-demo" \
       && { [ -d .venv ] || python3 -m venv .venv; } \
       && ./.venv/bin/pip install -q -r requirements.txt \
       && ./.venv/bin/uvicorn app.main:app --port 8082 ) \
@@ -89,7 +89,7 @@ else
 fi
 
 if have npm; then
-  ( cd "$ROOT/duckdb-odbc-node-demo" && npm install --silent && PORT=8083 npm start ) \
+  ( cd "$ROOT/odbc-scenarios/duckdb-odbc-node-demo" && npm install --silent && PORT=8083 npm start ) \
     >"$LOG_DIR/node.log" 2>&1 &
   PIDS+=("$!")
   echo "==> Starting node on http://localhost:8083  (log: logs/node.log)"
@@ -98,13 +98,13 @@ else
 fi
 
 if have go; then
-  start go 8084 duckdb-odbc-go-demo env PORT=8084 go run .
+  start go 8084 odbc-scenarios/duckdb-odbc-go-demo env PORT=8084 go run .
 else
   echo "--  Skipping Go demo (go not found)."
 fi
 
 if have cargo; then
-  start rust 8085 duckdb-odbc-rust-demo env PORT=8085 cargo run --release
+  start rust 8085 odbc-scenarios/duckdb-odbc-rust-demo env PORT=8085 cargo run --release
 else
   echo "--  Skipping Rust demo (cargo not found)."
 fi
