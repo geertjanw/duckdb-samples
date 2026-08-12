@@ -9,7 +9,7 @@ The samples are grouped into scenario folders:
 | [`odbc-scenarios`](odbc-scenarios) | Querying MySQL through the DuckDB **ODBC extension** with DuckDB embedded in a web app — the same demo built five times, once per language/framework. |
 | [`batch-scenarios`](batch-scenarios) | Data transformation inside **Spring Batch** jobs — DuckDB's vectorized engine vs. looping over rows in in-memory Java collections. |
 
-## odbc-scenarios: DuckDB ODBC extension demo
+## odbc-scenarios: DuckDB ODBC vs. MySQL scanner in a web app
 
 The same demo — query MySQL through the **DuckDB ODBC extension**, with DuckDB
 embedded in a web app — built five times, once per language/framework. Each
