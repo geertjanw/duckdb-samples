@@ -1,5 +1,6 @@
 /odbc-scenarios/duckdb-odbc-java-demo/target/
 /batch-scenarios/*/target/
 /batch-scenarios/data/
+/batch-scenarios/foojay-blog.md
 .DS_Store
 /logs/
