@@ -4,3 +4,4 @@
 /batch-scenarios/foojay-blog.md
 .DS_Store
 /logs/
+/chunked-scenarios/DuckDBDataChunkReader/target/

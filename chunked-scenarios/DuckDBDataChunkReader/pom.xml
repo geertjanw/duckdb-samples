@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.example</groupId>
+  <artifactId>duckdb-chunked-result-samples</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <name>DuckDB Java Driver: Chunked Query Results Samples</name>
+  <description>
+    Companion samples for the blog post "Chunked Query Results in the
+    DuckDB Java Driver": the classic row-at-a-time JDBC ResultSet vs.
+    reading results as lazily fetched columnar data chunks.
+  </description>
+
+  <properties>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Latest release at the time of writing (Aug 2026) -->
+    <duckdb.version>1.5.5.1</duckdb.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.duckdb</groupId>
+      <artifactId>duckdb_jdbc</artifactId>
+      <version>${duckdb.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>
