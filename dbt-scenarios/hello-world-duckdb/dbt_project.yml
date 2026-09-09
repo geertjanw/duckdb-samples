@@ -1,0 +1,10 @@
+name: hello_world_duckdb
+version: 1.0.0
+profile: hello_world_duckdb
+
+models:
+  hello_world_duckdb:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

@@ -1,0 +1,9 @@
+hello_world_duckdb:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: warehouse.duckdb
+      # httpfs lets DuckDB read the remote Parquet over HTTP range requests.
+      extensions:
+        - httpfs

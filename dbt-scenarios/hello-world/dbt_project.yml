@@ -1,0 +1,7 @@
+name: hello_world
+version: 1.0.0
+profile: hello_world
+
+models:
+  hello_world:
+    +materialized: table
