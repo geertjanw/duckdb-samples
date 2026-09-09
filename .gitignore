@@ -6,3 +6,4 @@
 /logs/
 /chunked-scenarios/DuckDBDataChunkReader/target/
 /udf-scenarios/DuckDBFunctions/target/
+/graalvm/recon/target/

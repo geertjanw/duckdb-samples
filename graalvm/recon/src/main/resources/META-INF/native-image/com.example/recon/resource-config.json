@@ -1,0 +1,8 @@
+{
+  "resources": {
+    "includes": [
+      { "pattern": "libduckdb_java\\.so_osx_universal" },
+      { "pattern": "sql/.*\\.sql" }
+    ]
+  }
+}
