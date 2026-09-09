@@ -9,3 +9,4 @@
 /graalvm/helloworld/*.jar
 /graalvm/helloworld/*.class
 /graalvm/helloworld/hello
+/graalvm/recon/target/
