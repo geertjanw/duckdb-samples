@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NYC taxi · DuckDB-WASM</title>
+<style>
+  :root { --duck:#fff000; --bg:#111; --fg:#f5f5f5; --mut:#888; }
+  body { margin:0; background:var(--bg); color:var(--fg); padding:2rem clamp(1rem,5vw,5rem);
+         font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  h1 { font-size:1.6rem; margin:0 0 .25rem; } h1 span { color:var(--duck); }
+  p.sub { color:var(--mut); margin:0 0 1.5rem; }
+  h2 { color:var(--duck); font-size:1rem; margin:2rem 0 .5rem; }
+  #status { color:var(--mut); font-size:.85rem; margin-bottom:1rem; }
+  table { border-collapse:collapse; width:100%; max-width:640px; }
+  th,td { text-align:left; padding:.4rem .8rem; border-bottom:1px solid #2a2a2a; }
+  th { color:var(--duck); } td.num,th.num { text-align:right; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+  <h1>NYC taxi trips, queried in the browser with <span>DuckDB-WASM</span></h1>
+  <p class="sub">The published dbt tables are plain Parquet. DuckDB compiled to
+    WebAssembly queries them right here — no server, no backend.</p>
+  <div id="status">Loading DuckDB-WASM…</div>
+
+  <h2>Do people tip? (by payment method)</h2>
+  <div id="payments"></div>
+  <h2>Trips by hour of day</h2>
+  <div id="hours"></div>
+
+<script type="module">
+import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/+esm";
+const status = document.getElementById("status");
+
+function render(el, rows, cols) {
+  const num = new Set(cols.filter(c => typeof rows[0]?.[c] === "number" || typeof rows[0]?.[c] === "bigint"));
+  const head = cols.map(c => `<th class="${num.has(c)?"num":""}">${c}</th>`).join("");
+  const body = rows.map(r => "<tr>" + cols.map(c => `<td class="${num.has(c)?"num":""}">${r[c]}</td>`).join("") + "</tr>").join("");
+  el.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+async function main() {
+  const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+  // The worker script lives on the jsDelivr CDN, but a browser won't construct a
+  // Worker from a cross-origin URL. Wrap it in a same-origin blob that pulls the
+  // CDN script in via importScripts — the documented DuckDB-WASM workaround.
+  const workerUrl = URL.createObjectURL(
+    new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
+  const worker = new Worker(workerUrl);
+  const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  URL.revokeObjectURL(workerUrl);
+
+  // Register the published Parquet files by absolute URL. Inside WASM a bare
+  // './foo.parquet' has no page origin to resolve against, so we register each
+  // file against the directory this page is served from and query it by name.
+  const base = new URL(".", location.href).href;
+  for (const f of ["payment_summary.parquet", "trips_by_hour.parquet"]) {
+    await db.registerFileURL(f, base + f, duckdb.DuckDBDataProtocol.HTTP, false);
+  }
+
+  const conn = await db.connect();
+  status.textContent = "DuckDB-WASM ready. Querying published Parquet…";
+
+  const q = async (sql) => {
+    const res = await conn.query(sql);
+    const cols = res.schema.fields.map(f => f.name);
+    return { cols, rows: res.toArray().map(r => Object.fromEntries(cols.map(c => [c, r[c]]))) };
+  };
+
+  const pay = await q(`select payment_method, trips, avg_tip, tip_pct
+                       from read_parquet('payment_summary.parquet') order by trips desc`);
+  render(document.getElementById("payments"), pay.rows, pay.cols);
+
+  const hrs = await q(`select pickup_hour, trips, avg_fare, avg_tip
+                       from read_parquet('trips_by_hour.parquet') order by pickup_hour`);
+  render(document.getElementById("hours"), hrs.rows, hrs.cols);
+
+  status.textContent = "Queried Parquet directly in the browser — no server involved.";
+}
+main().catch(e => { status.textContent = "Error: " + e.message; console.error(e); });
+</script>
+</body>
+</html>

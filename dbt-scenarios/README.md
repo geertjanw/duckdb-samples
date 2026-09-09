@@ -1,20 +1,22 @@
 # dbt-scenarios
 
-Two tiny [dbt](https://docs.getdbt.com/) projects, both using the
+A [dbt](https://docs.getdbt.com/) project built on the
 [dbt-duckdb](https://github.com/duckdb/dbt-duckdb) adapter (the zero-setup way to
-run dbt locally — no server, no credentials).
+run dbt locally — no server, no credentials), plus the talk materials that demo it.
 
-| Folder | What it shows |
+| Folder | What it is |
 |---|---|
-| [`hello-world`](hello-world) | The smallest dbt project that runs: one model, `select 'hello world'`. Nothing DuckDB-specific. |
-| [`hello-world-duckdb`](hello-world-duckdb) | DuckDB doing real work inside dbt: a model reads a **remote Parquet file directly**, a mart aggregates it via `ref()`. |
+| [`end-to-end-duckdb`](end-to-end-duckdb) | A dbt project **developed, tested, deployed, and served** entirely on DuckDB — a Python model, open-Parquet output, and a DuckDB-WASM page. Built to demo live in a few commands. |
+| [`presentation`](presentation) | Outline, speaker notes, and a DuckDB-branded deck for presenting the demo above. |
 
-Both run with:
+Run the project with:
 
 ```bash
-pip install dbt-duckdb
-cd dbt-scenarios/<folder>
-dbt run --profiles-dir .
+pip install dbt-duckdb pandas
+cd dbt-scenarios/end-to-end-duckdb
+export DBT_PROFILES_DIR=.
+dbt run
 ```
 
-See each folder's README for details.
+See [`end-to-end-duckdb/README.md`](end-to-end-duckdb/README.md) for the full
+four-command demo.

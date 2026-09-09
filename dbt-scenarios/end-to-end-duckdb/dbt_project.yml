@@ -1,0 +1,13 @@
+name: end_to_end_duckdb
+version: 1.0.0
+profile: end_to_end_duckdb
+
+vars:
+  # The source data. Defaults to one month of NYC yellow-taxi trips (~3M rows),
+  # which DuckDB reads straight from the public URL — no download, no setup.
+  # Point this at a local glob like 'data/*.parquet' to run on a lot more.
+  trips: "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet"
+
+models:
+  end_to_end_duckdb:
+    +materialized: table

@@ -4,3 +4,7 @@ logs/
 *.duckdb
 *.duckdb.wal
 .user.yml
+data/
+web/*.parquet
+.venv/
+.DS_Store
