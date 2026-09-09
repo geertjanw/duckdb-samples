@@ -6,7 +6,6 @@ nothing is invented for the slides.
 
 | File | What it is |
 |---|---|
-| [`outline.md`](outline.md) | Slide-by-slide arc with timings (~20 min) |
 | [`speaker-notes.md`](speaker-notes.md) | Full talk track, pre-flight checklist, and fallback plan |
 | **`deck.html`** | **Recommended.** Self-contained browser deck — no app needed |
 | `deck.pptx` | Keynote/PowerPoint version (imports into Keynote — see below) |

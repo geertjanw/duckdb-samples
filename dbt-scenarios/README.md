@@ -7,7 +7,7 @@ run dbt locally — no server, no credentials), plus the talk materials that dem
 | Folder | What it is |
 |---|---|
 | [`end-to-end-duckdb`](end-to-end-duckdb) | A dbt project **developed, tested, deployed, and served** entirely on DuckDB — a Python model, open-Parquet output, and a DuckDB-WASM page. Built to demo live in a few commands. |
-| [`presentation`](presentation) | Outline, speaker notes, and a DuckDB-branded deck for presenting the demo above. |
+| [`presentation`](presentation) | Speaker notes and a DuckDB-branded deck for presenting the demo above. |
 
 Run the project with:
 
