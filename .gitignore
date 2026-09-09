@@ -6,3 +6,6 @@
 /logs/
 /chunked-scenarios/DuckDBDataChunkReader/target/
 /udf-scenarios/DuckDBFunctions/target/
+/graalvm/helloworld/*.jar
+/graalvm/helloworld/*.class
+/graalvm/helloworld/hello
