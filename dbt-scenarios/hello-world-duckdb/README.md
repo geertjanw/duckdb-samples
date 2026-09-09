@@ -1,9 +1,9 @@
 # hello-world-duckdb
 
-The same dbt-duckdb setup as [`../hello-world`](../hello-world), but now DuckDB
-actually earns its place: a staging model reads a **remote Parquet file directly**
-— no ingestion job, no `COPY`, no external-table DDL — and a mart aggregates it
-through a normal dbt `ref()`.
+The same dbt-duckdb setup as [`../hello-world`](../hello-world), but here a
+staging model reads a **remote Parquet file directly** — no ingestion job, no
+`COPY`, no external-table DDL — and a mart aggregates it through a normal dbt
+`ref()`.
 
 The data is DuckDB's public `train_services` dataset (~381,000 Dutch railway
 stop records).
