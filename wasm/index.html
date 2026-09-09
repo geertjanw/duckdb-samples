@@ -1,0 +1,74 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DuckDB-Wasm OPFS: data files from a remote Parquet</title>
+<pre id="out">running...</pre>
+<script type="module">
+// In a bundled project this is: import * as duckdb from '@duckdb/duckdb-wasm';
+import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0/+esm';
+
+const bundles = duckdb.getJsDelivrBundles();
+const bundle = await duckdb.selectBundle(bundles);
+
+// Worker scripts must be same-origin, so wrap the CDN worker URL in a Blob
+const workerUrl = URL.createObjectURL(
+    new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
+);
+const worker = new Worker(workerUrl);
+const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
+await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+URL.revokeObjectURL(workerUrl);
+
+// Open the persistent database. fileHandling: 'auto' is required for the
+// COPY / SELECT on opfs:// paths below (see "File Handling Modes" in the post).
+await db.open({
+    path: 'opfs://analytics.duckdb',
+    accessMode: duckdb.DuckDBAccessMode.READ_WRITE,
+    opfs: { fileHandling: 'auto' },
+});
+
+const conn = await db.connect();
+
+// Load a real Parquet file over HTTP (TPC-H orders, scale factor 0.01, ~1,500 rows).
+// DuckDB-Wasm reads it with HTTP range requests; nothing is downloaded up front.
+const SOURCE = 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet';
+await conn.query(`
+    CREATE TABLE IF NOT EXISTS orders AS
+    SELECT * FROM '${SOURCE}';
+`);
+await conn.query('CHECKPOINT');
+
+// --- Data Files section of the post, on the orders table ---
+await conn.query(`
+    COPY (
+        SELECT o_orderpriority AS priority,
+               date_trunc('month', o_orderdate) AS month,
+               sum(o_totalprice) AS total
+        FROM orders
+        GROUP BY ALL
+        ORDER BY 2, 1
+    ) TO 'opfs://cache/monthly_totals.parquet';
+`);
+
+const result = await conn.query(`SELECT * FROM 'opfs://cache/monthly_totals.parquet' LIMIT 10`);
+const rows = result.toArray().map(r => r.toJSON());
+
+// Show the Parquet contents and the OPFS directory listing
+async function listOpfs(dir, prefix = '') {
+    dir = dir ?? await navigator.storage.getDirectory();
+    const out = [];
+    for await (const [name, h] of dir.entries()) {
+        if (h.kind === 'file') out.push(`${prefix}${name} ${(await h.getFile()).size} B`);
+        else out.push(...await listOpfs(h, prefix + name + '/'));
+    }
+    return out;
+}
+document.getElementById('out').textContent =
+    'monthly_totals.parquet (first 10 rows):\n' +
+    rows.map(r => `  ${r.priority}  ${new Date(Number(r.month)).toISOString().slice(0, 7)}  ${Number(r.total).toFixed(2)}`).join('\n') +
+    '\n\nOPFS files:\n  ' + (await listOpfs()).join('\n  ');
+
+// Not needed for this test:
+// const n = (await conn.query('SELECT count(*) AS n FROM orders')).toArray()[0].n;
+// await conn.close();
+// await db.terminate();
+</script>
