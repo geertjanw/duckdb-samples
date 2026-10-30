@@ -7,3 +7,4 @@
 /chunked-scenarios/DuckDBDataChunkReader/target/
 /udf-scenarios/DuckDBFunctions/target/
 /graalpy-scenarios/*/target/
+/wasm-scenarios/*/target/
