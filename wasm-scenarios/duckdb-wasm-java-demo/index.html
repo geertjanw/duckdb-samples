@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Java + DuckDB-Wasm</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #ccc; padding: .4rem .8rem; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Revenue by region</h1>
+  <p id="status">Loading DuckDB…</p>
+  <table id="results"></table>
+
+  <script type="module">
+    import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm/+esm';
+    const status = document.getElementById('status');
+
+    // 1. Boot DuckDB-Wasm
+    const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+    const workerUrl = URL.createObjectURL(
+      new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
+    );
+    const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), new Worker(workerUrl));
+    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    URL.revokeObjectURL(workerUrl);
+
+    // 2. Fetch the data from the Java backend and register it as a file
+    status.textContent = 'Fetching data from Java…';
+    const csv = await (await fetch('/api/sales.csv')).text();
+    await db.registerFileText('sales.csv', csv);
+
+    // 3. Query it with SQL, in the browser
+    const conn = await db.connect();
+    await conn.query(`CREATE TABLE sales AS SELECT * FROM read_csv('sales.csv')`);
+    const result = await conn.query(`
+      SELECT region,
+             count(*)               AS orders,
+             round(sum(amount), 2)  AS revenue,
+             round(avg(amount), 2)  AS avg_order
+      FROM sales
+      GROUP BY region
+      ORDER BY revenue DESC
+    `);
+
+    // 4. Render the result
+    const rows = result.toArray().map(r => r.toJSON());
+    document.getElementById('results').innerHTML =
+      `<tr><th>Region</th><th>Orders</th><th>Revenue</th><th>Avg order</th></tr>` +
+      rows.map(r => `<tr><td>${r.region}</td><td>${r.orders}</td>
+                         <td>${r.revenue}</td><td>${r.avg_order}</td></tr>`).join('');
+    status.textContent = `Analysed ${csv.split('\n').length - 2} rows in the browser.`;
+
+    await conn.close();
+  </script>
+</body>
+</html>

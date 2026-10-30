@@ -8,6 +8,7 @@ The samples are grouped into scenario folders:
 |---|---|
 | [`odbc-scenarios`](odbc-scenarios) | Querying MySQL through the DuckDB **ODBC extension** with DuckDB embedded in a web app — the same demo built five times, once per language/framework. |
 | [`batch-scenarios`](batch-scenarios) | Data transformation inside **Spring Batch** jobs — DuckDB's vectorized engine vs. looping over rows in in-memory Java collections. |
+| [`wasm-scenarios`](wasm-scenarios) | A Java backend sends a dataset once and **DuckDB-Wasm** runs the SQL in the browser tab — a two-file, zero-dependency example. |
 
 ## odbc-scenarios: DuckDB ODBC vs. MySQL scanner in a web app
 
@@ -58,3 +59,20 @@ differs (this machine, timing the transform step only):
 The Java loop is single-threaded and pays per-row parsing/boxing costs; DuckDB
 vectorizes the scan and aggregation across all cores — which is exactly why you'd
 reach for it as the transformation step inside a batch job.
+
+## wasm-scenarios: DuckDB-Wasm analytics in the browser, Java as the backend
+
+A Java `HttpServer` serves a page and a CSV endpoint; the browser downloads the
+CSV once and DuckDB-Wasm runs every aggregation and filter locally, as SQL. See
+[`wasm-scenarios`](wasm-scenarios) for details.
+
+| Demo | What it shows |
+|---|---|
+| [`duckdb-wasm-java-demo`](wasm-scenarios/duckdb-wasm-java-demo) | Two files — `Server.java` and `index.html` — with no Maven, npm or framework |
+
+Java only produces raw rows; the `GROUP BY`, `sum` and `avg` run in the browser
+tab. The compute moves off the server, and because it is the same engine and the
+same SQL as server-side DuckDB, a query written for one side runs unchanged on
+the other. Best when a per-user dataset is small enough to download but gets
+asked many questions; the trade-off is that the data has to fit in the tab and
+the user can read everything sent.
