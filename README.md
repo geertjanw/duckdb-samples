@@ -9,6 +9,7 @@ The samples are grouped into scenario folders:
 | [`odbc-scenarios`](odbc-scenarios) | Querying MySQL through the DuckDB **ODBC extension** with DuckDB embedded in a web app — the same demo built five times, once per language/framework. |
 | [`batch-scenarios`](batch-scenarios) | Data transformation inside **Spring Batch** jobs — DuckDB's vectorized engine vs. looping over rows in in-memory Java collections. |
 | [`wasm-scenarios`](wasm-scenarios) | A Java backend sends a dataset once and **DuckDB-Wasm** runs the SQL in the browser tab — a two-file, zero-dependency example. |
+| [`graalpy-scenarios`](graalpy-scenarios) | **DuckDB (JDBC) and Python (GraalPy) in one JVM** — DuckDB runs the SQL, Python applies the business rules, no boundary between them. |
 
 ## odbc-scenarios: DuckDB ODBC vs. MySQL scanner in a web app
 
@@ -76,3 +77,20 @@ same SQL as server-side DuckDB, a query written for one side runs unchanged on
 the other. Best when a per-user dataset is small enough to download but gets
 asked many questions; the trade-off is that the data has to fit in the tab and
 the user can read everything sent.
+
+## graalpy-scenarios: DuckDB and Python in the same JVM
+
+Following Graeme Rocher's PyCon FR 2026 talk [*Fusing Python with Java using
+GraalPy and Micronaut*](https://www.pycon.fr/2026/en/talks/long-talk.html#talk-3JHBZY),
+this runs Python inside the JVM so it sits next to a Java library — here DuckDB.
+See [`graalpy-scenarios`](graalpy-scenarios) for details.
+
+| Demo | What it shows |
+|---|---|
+| [`duckdb-graalpy-demo`](graalpy-scenarios/duckdb-graalpy-demo) | DuckDB (JDBC) aggregates 1,000 rows; Python (GraalPy) tiers and formats the result, in one process |
+
+DuckDB does the vectorized SQL over the full dataset; Python applies the per-row
+business rules to the small aggregated result. The rows pass from DuckDB into
+Python as a Java array in the same process — no REST, no subprocess, no JSON.
+DuckDB handles data volume, Python stays readable for the rules, and moving logic
+between them is editing one file rather than crossing a network boundary.
