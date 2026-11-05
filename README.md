@@ -10,6 +10,7 @@ The samples are grouped into scenario folders:
 | [`batch-scenarios`](batch-scenarios) | Data transformation inside **Spring Batch** jobs — DuckDB's vectorized engine vs. looping over rows in in-memory Java collections. |
 | [`wasm-scenarios`](wasm-scenarios) | A Java backend sends a dataset once and **DuckDB-Wasm** runs the SQL in the browser tab — including one where the backend produces the data with Python on GraalPy. |
 | [`graalpy-scenarios`](graalpy-scenarios) | **DuckDB (JDBC) and Python (GraalPy) in one JVM** — DuckDB runs the SQL, Python applies the business rules, no boundary between them. |
+| [`jsrs/jsr-381`](jsrs/jsr-381) | A **JSR 381** (Java Visual Recognition API) image classifier whose model is a **DuckDB table**: classifying is a nearest-neighbour vote in SQL. |
 
 ## odbc-scenarios: DuckDB ODBC vs. MySQL scanner in a web app
 

@@ -8,3 +8,5 @@
 /udf-scenarios/DuckDBFunctions/target/
 /graalpy-scenarios/*/target/
 /wasm-scenarios/*/target/
+/jsrs/*/target/
+/jsrs/*/model.duckdb
